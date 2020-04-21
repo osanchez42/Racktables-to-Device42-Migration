@@ -42,7 +42,7 @@ try:
     print(conf.sections())
 except Exception as e:
     print(e)
-    print('failed to read conf.cfg file, did you rename conf.cfg.sample.cfg to conf.cfg?')
+    print('failed to read conf.cfg file, did you rename conf.sample.cfg to conf.cfg?')
     exit(1)
 
 
