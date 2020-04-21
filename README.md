@@ -4,7 +4,7 @@ that integrates centralized password management, impact charts and applications 
 This repository contains sample script to take Inventory information from a RackTables installation and send it to Device42 appliance using the REST APIs.
 ## Version
 -----------------------------
-    * 5.33
+    * 6.00
 
 ## Assumptions
 -----------------------------
@@ -13,47 +13,45 @@ This repository contains sample script to take Inventory information from a Rack
 
 ### Requirements
 -----------------------------
-    * python 2.7.x
-    * pymysql (you can install it on ubuntu with `sudo pip install pymysql`, other similar commands for other OS)
-    * requests (you can install it with sudo pip install requests or sudo apt-get install python-requests)
+    * python 3.7.x
 	* allow remote connections to RackTables MySQL port 3306
 
 ### Usage
 -----------------------------
-
-    * copy conf.sample to conf
-    * in conf add D42 URL/credentials
-```
-# ====== Device42 upload settings ========= #
-D42_USER = 'device42 user'
-D42_PWD = 'device42 password'
-D42_URL = 'https:// device42 server IP address'
+* Install dependencies by running the following
+    
+```python
+pip3 install -r requirements.txt
 ```
 
-    * add RackTables DB info/credentials
+* copy conf.sample.cfg to conf.cfg
+* in conf.cfg add D42 URL/credentials
+
+***conf.cfg***
 ```
-# ====== MySQL Source (Racktables) ====== #
-DB_IP = 'racktables server IP'
-DB_PORT = '3306'
-DB_NAME = 'racktables database name'
-DB_USER = 'racktables user'
-DB_PWD = 'racktables password'
-```
-	* adjust log settings
-```
-# ====== Log settings ==================== #
-LOGFILE = 'migration.log'
-STDOUT = True # print to STDOUT
-DEBUG = True # write debug log
-DEBUG_LOG = 'debug.log'
-```
-	* other setings
-```
-# ====== Other settings ========= #
+[Racktables_MySQL_Source]
+DB_IP = racktables_ip
+DB_PORT = 3306
+DB_NAME = racktables_db_name
+DB_USER = racktables_user
+DB_PWD = racktables_password
+
+[Log_Settings]
+LOGFILE = migration.log
+STDOUT = True
+DEBUG = True
+DEBUG_LOG = debug.log
+
+[Device42_Settings]
+D42_USER = device42_user
+D42_PWD = device42_password
+D42_URL = http://10.0.0.0
+
+[Other]
 CHILD_AS_BUILDING = True
 ROW_AS_ROOM = True
-PDU_MOUNT = 'left'
-PDU_ORIENTATION = 'front'
+PDU_MOUNT = left
+PDU_ORIENTATION = front
 ```
 
 - CHILD_AS_BUILDING: Racktables uses a concept of location and sub-location (container within container). Device42 uses a concept of Buildings and Rooms. In case CHILD_AS_BUILDING is set to True, sub-locations will be uploaded as Rooms to Device42. Otherwise, sub-locations will be uploaded as Buildings.
