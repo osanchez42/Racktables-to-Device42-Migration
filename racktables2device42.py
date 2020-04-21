@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-__version__ = 5.33
+__version__ = 6.00
 
 """
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
@@ -13,33 +13,42 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 """
 
 #############################################################################################################
-# v5.0 of python script that connects to RackTables DB and migrates data to Device42 appliance using APIs
+# v6.0 of python script that connects to RackTables DB and migrates data to Device42 appliance using APIs
 # Refer to README for further instructions
 #############################################################################################################
 
-
+import configparser
 import sys
-import imp
 import os
 import pymysql as sql
 import codecs
 import requests
-import base64
 import struct
 import socket
 import json
+from requests.auth import HTTPBasicAuth
+
+dir_path = os.path.dirname(os.path.realpath(__file__))
 
 try:
     requests.packages.urllib3.disable_warnings()
 except:
     pass
 
-conf = imp.load_source('conf', 'conf')
+conf = configparser.ConfigParser()
+
+try:
+    config_reader = conf.read(dir_path + '\conf.cfg')
+    print(conf.sections())
+except Exception as e:
+    print(e)
+    print('failed to read conf.cfg file, did you rename conf.cfg.sample.cfg to conf.cfg?')
+    exit(1)
 
 
 class Logger:
     def __init__(self, logfile, stdout):
-        print '[!] Version %s' % __version__
+        print('[!] Version %s' % __version__)
         self.logfile = logfile
         self.stdout = stdout
         self.check_log_file()
@@ -47,7 +56,8 @@ class Logger:
     def check_log_file(self):
         while 1:
             if os.path.exists(self.logfile):
-                reply = raw_input("[!] Log file already exists. Overwrite or append [O|A]? ")
+                reply = input("[!] Log file already exists. Overwrite or append [O|A]? ")
+                print(reply)
                 if reply.lower().strip() == 'o':
                     with open(self.logfile, 'w'):
                         pass
@@ -56,25 +66,25 @@ class Logger:
                     break
             else:
                 break
-        if conf.DEBUG and os.path.exists(conf.DEBUG_LOG):
-            with open(conf.DEBUG_LOG, 'w'):
+        if conf['Log_Settings']['DEBUG'] and os.path.exists(conf['Log_Settings']['DEBUG_LOG']):
+            with open(conf['Log_Settings']['DEBUG_LOG'], 'w'):
                 pass
 
     def writer(self, msg):
-        if conf.LOGFILE and conf.LOGFILE != '':
+        if conf['Log_Settings']['LOGFILE'] and conf['Log_Settings']['LOGFILE'] != '':
             with codecs.open(self.logfile, 'a', encoding='utf-8') as f:
-                msg = msg.decode('UTF-8', 'ignore')
+                msg = str(msg)
                 f.write(msg + '\r\n')  # \r\n for notepad
         if self.stdout:
             try:
-                print msg
+                print(msg)
             except:
-                print msg.encode('ascii', 'ignore') + ' # < non-ASCII chars detected! >'
+                print(msg.encode('ascii', 'ignore') + ' # < non-ASCII chars detected! >')
 
     @staticmethod
     def debugger(msg):
-        if conf.DEBUG_LOG and conf.DEBUG_LOG != '':
-            with codecs.open(conf.DEBUG_LOG, 'a', encoding='utf-8') as f:
+        if conf['Log_Settings']['DEBUG_LOG'] and conf['Log_Settings']['DEBUG_LOG'] != '':
+            with codecs.open(conf['Log_Settings']['DEBUG_LOG'], 'a', encoding='utf-8') as f:
                 title, message = msg
                 row = '\n-----------------------------------------------------\n%s\n%s' % (title, message)
                 f.write(row + '\r\n\r\n')  # \r\n for notepad
@@ -82,22 +92,22 @@ class Logger:
 
 class REST:
     def __init__(self):
-        self.password = conf.D42_PWD
-        self.username = conf.D42_USER
-        self.base_url = conf.D42_URL
+
+        self.password = conf['Device42_Settings']['D42_PWD']
+        self.username = conf['Device42_Settings']['D42_USER']
+        self.base_url = conf['Device42_Settings']['D42_URL']
 
     def uploader(self, data, url):
         payload = data
         headers = {
-            'Authorization': 'Basic ' + base64.b64encode(self.username + ':' + self.password),
             'Content-Type': 'application/x-www-form-urlencoded'
         }
 
         if 'custom_fields' in url:
-            r = requests.put(url, data=payload, headers=headers, verify=False)
+            r = requests.put(url, data=payload, headers=headers, auth=HTTPBasicAuth(self.username, self.password), verify=False)
         else:
-            r = requests.post(url, data=payload, headers=headers, verify=False)
-        msg = unicode(payload)
+            r = requests.post(url, data=payload, headers=headers, auth=HTTPBasicAuth(self.username, self.password), verify=False)
+        msg = str(payload).encode()
         logger.writer(msg)
         msg = 'Status code: %s' % str(r.status_code)
         logger.writer(msg)
@@ -106,18 +116,16 @@ class REST:
 
         try:
             return r.json()
-        except Exception as e:
-
-            print '\n[*] Exception: %s' % str(e)
+        except Exception as err:
+            print('\n[*] Exception: %s' % str(err))
             pass
 
     def fetcher(self, url):
         headers = {
-            'Authorization': 'Basic ' + base64.b64encode(self.username + ':' + self.password),
             'Content-Type': 'application/x-www-form-urlencoded'
         }
 
-        r = requests.get(url, headers=headers, verify=False)
+        r = requests.get(url, headers=headers, verify=False, auth=HTTPBasicAuth(self.username, self.password))
         msg = 'Status code: %s' % str(r.status_code)
         logger.writer(msg)
         msg = str(r.text)
@@ -280,8 +288,11 @@ class DB:
         Connection to RT database
         :return:
         """
-        self.con = sql.connect(host=conf.DB_IP, port=int(conf.DB_PORT),
-                               db=conf.DB_NAME, user=conf.DB_USER, passwd=conf.DB_PWD)
+        self.con = sql.connect(host=conf['Racktables_MySQL_Source']['DB_IP'],
+                               port=int(conf['Racktables_MySQL_Source']['DB_PORT']),
+                               db=conf['Racktables_MySQL_Source']['DB_NAME'],
+                               user=conf['Racktables_MySQL_Source']['DB_USER'],
+                               passwd=conf['Racktables_MySQL_Source']['DB_PWD'])
 
     @staticmethod
     def convert_ip(ip_raw):
@@ -306,7 +317,7 @@ class DB:
             q = 'SELECT * FROM IPv4Address WHERE IPv4Address.name != ""'
             cur.execute(q)
             ips = cur.fetchall()
-            if conf.DEBUG:
+            if conf['Log_Settings']['DEBUG']:
                 msg = ('IPs', str(ips))
                 logger.debugger(msg)
 
@@ -338,7 +349,7 @@ class DB:
             q = "SELECT * FROM IPv4Network"
             cur.execute(q)
             subnets = cur.fetchall()
-            if conf.DEBUG:
+            if conf['Log_Settings']['DEBUG']:
                 msg = ('Subnets', str(subnets))
                 logger.debugger(msg)
         for line in subnets:
@@ -369,7 +380,7 @@ class DB:
             q = """select id,name, parent_id, parent_name from Location"""
             cur.execute(q)
             raw = cur.fetchall()
-        if conf.CHILD_AS_BUILDING:
+        if conf['Other']['CHILD_AS_BUILDING']:
             for rec in raw:
                 building_id, building_name, parent_id, parent_name = rec
                 buildings_map.update({building_id: building_name})
@@ -385,7 +396,7 @@ class DB:
             self.d42_racks.update({d42_rack['name']: d42_rack['rack_id']})
 
         # upload buildings
-        if conf.DEBUG:
+        if conf['Log_Settings']['DEBUG']:
             msg = ('Buildings', str(buildings_map))
             logger.debugger(msg)
         bdata = {}
@@ -395,7 +406,7 @@ class DB:
 
         # upload rooms
         buildings = json.loads((rest.get_buildings()))['buildings']
-        if not conf.CHILD_AS_BUILDING:
+        if not conf['Other']['CHILD_AS_BUILDING']:
             for room, parent in rooms_map.items():
                 roomdata = {}
                 roomdata.update({'name': room})
@@ -421,7 +432,7 @@ class DB:
                 rack.update({'rack_id': self.d42_racks[rack_name]})
             rack.update({'size': height})
             rack.update({'rt_id': rack_id})  # we will remove this later
-            if conf.ROW_AS_ROOM:
+            if conf['Other']['ROW_AS_ROOM']:
                 rack.update({'room': row_name})
                 rack.update({'building': location_name})
             else:
@@ -436,8 +447,8 @@ class DB:
             racks.append(rack)
 
         # upload rows as rooms
-        if conf.ROW_AS_ROOM:
-            if conf.DEBUG:
+        if conf['Other']['ROW_AS_ROOM']:
+            if conf['Log_Settings']['DEBUG']:
                 msg = ('Rooms', str(rows_map))
                 logger.debugger(msg)
             for room, parent in rows_map.items():
@@ -447,7 +458,7 @@ class DB:
                 rest.post_room(roomdata)
 
         # upload racks
-        if conf.DEBUG:
+        if conf['Log_Settings']['DEBUG']:
             msg = ('Racks', str(racks))
             logger.debugger(msg)
         for rack in racks:
@@ -482,7 +493,7 @@ class DB:
             cur.execute(q)
         data = cur.fetchall()
 
-        if conf.DEBUG:
+        if conf['Log_Settings']['DEBUG']:
             msg = ('Hardware', str(data))
             logger.debugger(msg)
 
@@ -941,11 +952,11 @@ class DB:
                     IPv4Allocation.ip,IPv4Allocation.name,
                     Object.name as hostname
                     FROM %s.`IPv4Allocation`
-                    LEFT JOIN Object ON Object.id = object_id""" % conf.DB_NAME
+                    LEFT JOIN Object ON Object.id = object_id""" % conf['Racktables_MySQL_Source']['DB_NAME']
             cur.execute(q)
         data = cur.fetchall()
 
-        if conf.DEBUG:
+        if conf['Log_Settings']['DEBUG']:
             msg = ('Device to IP', str(data))
             logger.debugger(msg)
 
@@ -978,7 +989,7 @@ class DB:
             cur.execute(q)
         data = cur.fetchall()
 
-        if conf.DEBUG:
+        if conf['Log_Settings']['DEBUG']:
             msg = ('PDUs', str(data))
             logger.debugger(msg)
 
@@ -1063,12 +1074,12 @@ class DB:
                         \n[!] INFO: Cannot mount pdu "%s" (RT id = %d) to the rack.\
                         \n\tWrong rack id map value: %s' % (name, pdu_id, str(rack_id))
                         logger.writer(msg)
-                    if conf.PDU_MOUNT.lower() in ('left', 'right', 'above', 'below'):
-                        where = conf.PDU_MOUNT.lower()
+                    if conf['Other']['PDU_MOUNT'].lower() in ('left', 'right', 'above', 'below'):
+                        where = conf['Other']['PDU_MOUNT'].lower()
                     else:
                         where = 'left'
-                    if conf.PDU_ORIENTATION.lower() in ('front', 'back'):
-                        mount = conf.PDU_ORIENTATION.lower()
+                    if conf['Other']['PDU_ORIENTATION'].lower() in ('front', 'back'):
+                        mount = conf['Other']['PDU_ORIENTATION'].lower()
                     else:
                         mount = 'front'
                     rdata = {}
@@ -1102,7 +1113,7 @@ class DB:
             cur.execute(q)
         data = cur.fetchall()
 
-        if conf.DEBUG:
+        if conf['Log_Settings']['DEBUG']:
             msg = ('PDUs', str(data))
             logger.debugger(msg)
 
@@ -1263,8 +1274,8 @@ def main():
 
 
 if __name__ == '__main__':
-    logger = Logger(conf.LOGFILE, conf.STDOUT)
+    logger = Logger(conf['Log_Settings']['LOGFILE'], conf['Log_Settings']['STDOUT'])
     rest = REST()
     main()
-    print '\n[!] Done!'
+    print('\n[!] Done!')
     sys.exit()
