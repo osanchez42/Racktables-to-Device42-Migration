@@ -727,6 +727,7 @@ class DB:
         devicedata = {}
         device2rack = {}
         name = None
+        serial_no = None
         opsys = None
         hardware = None
         note = None
@@ -740,6 +741,7 @@ class DB:
             rlocation_id, rlocation_name, rparent_name = x
 
             name = x[1]
+            serial_no = x[3]
             note = x[-7]
 
             if 'Operating System' in x:
@@ -782,6 +784,8 @@ class DB:
         if name:
             # set device data
             devicedata.update({'name': name})
+            if serial_no:
+                devicedata.update({'serial_no': serial_no})
             if hardware:
                 devicedata.update({'hardware': hardware[:48]})
             if opsys:
