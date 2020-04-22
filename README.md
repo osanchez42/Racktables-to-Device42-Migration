@@ -4,7 +4,7 @@ that integrates centralized password management, impact charts and applications 
 This repository contains sample script to take Inventory information from a RackTables installation and send it to Device42 appliance using the REST APIs.
 ## Version
 -----------------------------
-    * 6.00
+    * 6.10
 
 ## Assumptions
 -----------------------------
@@ -48,6 +48,7 @@ D42_PWD = device42_password
 D42_URL = http://10.0.0.0
 
 [Other]
+CREATE_AVAILABLE_IPS = False
 CHILD_AS_BUILDING = True
 ROW_AS_ROOM = True
 PDU_MOUNT = left
