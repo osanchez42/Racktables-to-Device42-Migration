@@ -26,6 +26,7 @@ import requests
 import struct
 import socket
 import json
+import ipaddress
 from requests.auth import HTTPBasicAuth
 
 dir_path = os.path.dirname(os.path.realpath(__file__))
@@ -39,7 +40,6 @@ conf = configparser.ConfigParser()
 
 try:
     config_reader = conf.read(dir_path + '\conf.cfg')
-    print(conf.sections())
 except Exception as e:
     print(e)
     print('failed to read conf.cfg file, did you rename conf.sample.cfg to conf.cfg?')
@@ -359,6 +359,19 @@ class DB:
             subs.update({'mask_bits': str(mask)})
             subs.update({'name': name})
             rest.post_subnet(subs)
+
+            if conf['Other']['CREATE_AVAILABLE_IPS']:
+                for ip in [str(ip) for ip in ipaddress.IPv4Network(str(subnet) + '/' + str(mask))]:
+                    if conf['Log_Settings']['DEBUG']:
+                        msg = ('IPs', ipaddress.IPv4Network(str(subnet) + '/' + str(mask)))
+                        logger.debugger(msg)
+
+                    ip_data = {
+                        'ipaddress': ip,
+                        'subnet': name
+                    }
+
+                    rest.post_ip(ip_data)
 
     def get_infrastructure(self):
         """
@@ -1274,8 +1287,11 @@ def main():
 
 
 if __name__ == '__main__':
-    logger = Logger(conf['Log_Settings']['LOGFILE'], conf['Log_Settings']['STDOUT'])
-    rest = REST()
-    main()
-    print('\n[!] Done!')
-    sys.exit()
+    try:
+        logger = Logger(conf['Log_Settings']['LOGFILE'], conf['Log_Settings']['STDOUT'])
+        rest = REST()
+        main()
+        print('\n[!] Done!')
+    except KeyError:
+        print('\n[!] Ensure that the script has been properly configured. Did you create the conf.cfg file?')
+        print('\n[!] Done!')
