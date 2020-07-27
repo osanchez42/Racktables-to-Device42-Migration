@@ -1,0 +1,8 @@
+certifi==2020.4.5.1
+chardet==3.0.4
+configparser==4.0.2
+idna==2.9
+ipaddress==1.0.23
+PyMySQL==0.9.3
+requests==2.23.0
+urllib3==1.25.9
